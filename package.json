@@ -2,5 +2,8 @@
   "name": "simple-user-site",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "dev": "node scripts/dev.js"
+  }
 }

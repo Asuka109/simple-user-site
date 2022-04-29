@@ -1,52 +1,105 @@
 import Router from '@koa/router';
 import koaBody from 'koa-body';
-
+import crypto from 'crypto';
 import Koa from 'koa';
+import cors from '@koa/cors';
+import assert from 'assert';
 
-const app = module.exports = new Koa();
+const app = new Koa();
 
 // database
 
+export interface User {
+  id: string;
+  uname: string;
+  password: {
+    hashed: string;
+    salt: string;
+  };
+}
+
+const users: User[] = [
+  {
+    id: 'wh70sdh80',
+    uname: 'zhx',
+    password: {
+      hashed: hash('123456', 'random_salt'),
+      salt: 'random_salt'
+    }
+  },
+]
+
+export class UserModel {
+  static findOne(query: Partial<User>): User | null {
+    return users.find(user => {
+      if (query.id && user.id !== query.id) {
+        return false;
+      }
+      if (query.uname && user.uname !== query.uname) {
+        return false;
+      }
+      if (query.password?.hashed && user.password.hashed !== query.password.hashed) {
+        return false;
+      }
+      return true;
+    }) || null;
+  }
+}
+
+// utils
+
+function hash(password: string, salt: string): string {
+  return crypto
+    .createHash('sha256')
+    .update(`${password}:${salt}`)
+    .digest('base64');
+}
+
 // middleware
 
+app.use(cors());
 app.use(koaBody());
 
 // User Api Routes
 
 const api = new Router()
 
-api.get('/user', async ctx => {
-
-});
-
-api.post('/login', async ctx => {
-
-});
-
-api.post('/register', async ctx => {
-
-});
-
-// Authed Routes
-
-const authed = new Router();
-
-authed.use(async (ctx, next) => {
-  ctx.
-  await next();
-});
-
-authed.get('/user/secret', async ctx => {
-  ctx.body = {
-    message: 'You have access to this secret message.'
+api.post('/api/login', async ctx => {
+  // validating request body
+  const { uname, password } = ctx.request.body;
+  try {
+    assert(uname, 'uname is required');
+    assert(password, 'password is required');
+  } catch (err: any) {
+    ctx.status = 400;
+    return ctx.body = { message: err.message };
   }
-})
+  const user = UserModel.findOne({ uname });
+  if (!user) {
+    ctx.status = 401;
+    ctx.body = { message: '用户名或密码错误' };
+    return;
+  }
+  const hashedPassword = hash(password, user.password.salt);
+  if (user.password.hashed !== hashedPassword) {
+    ctx.status = 401;
+    ctx.body = { message: '用户名或密码错误' };
+    return;
+  }
+  ctx.body = {
+    message: '登录成功',
+    user: {
+      id: user.id,
+      uname: user.uname
+    }
+  };
+});
 
 // Register Routes
 
 app.use(api.routes());
-app.use(authed.routes());
 
 // listen
 
-app.listen(3000);
+app.listen(8000);
+console.log(`Registered users: ${JSON.stringify(users, null, 2)}`);
